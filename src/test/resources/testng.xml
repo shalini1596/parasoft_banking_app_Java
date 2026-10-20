@@ -1,0 +1,8 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="ParaBank Selenium Suite" parallel="false">
+    <test name="ParaBank Cucumber Scenarios">
+        <classes>
+            <class name="com.parabank.runners.TestRunner"/>
+        </classes>
+    </test>
+</suite>

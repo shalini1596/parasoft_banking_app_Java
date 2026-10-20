@@ -1,0 +1,381 @@
+PARABANK SELENIUM JAVA FRAMEWORK
+INTERVIEW EXPLANATION AND SPEAKING NOTES
+============================================================
+
+PROJECT SUMMARY
+---------------
+This project is an end-to-end UI automation framework for the ParaBank
+application at https://parabank.parasoft.com/parabank. It is built with Java
+17, Maven, Selenium WebDriver, Cucumber, TestNG, the Page Object Model (POM),
+and Allure reporting.
+
+The framework automates customer-facing workflows including login and
+registration, account overview and transaction history, opening accounts,
+transfers, bill payment, searching transactions, updating a profile, loan
+requests, contact form submission, and forgotten-login lookup. These are UI
+automation scenarios against the public ParaBank demo site; actions such as
+registration, transfers, payments, and profile changes modify application
+data and should be run only against an appropriate test account.
+
+
+SUGGESTED INTERVIEW INTRODUCTION
+-------------------------------
+"I built a Java-based end-to-end UI automation framework for ParaBank using
+Selenium WebDriver, Maven, Cucumber, TestNG, Page Object Model, and Allure.
+Maven manages the project dependencies and test lifecycle. Cucumber feature
+files describe user workflows in business-readable Gherkin, while step
+definitions connect those steps to page objects. The page objects hold the
+locators and interactions for each application page, which keeps UI details
+out of the test scenarios.
+
+"Each scenario gets a fresh browser session through a thread-local
+WebDriver factory, and Cucumber PicoContainer shares a scenario-level test
+context with the hooks and step definitions. Configuration and test data are
+externalized in config.properties, with system properties and environment
+variables taking precedence. Registration uses a single scenario and generates
+a unique username so one suite execution creates one new test customer.
+Allure collects Cucumber results, and failed scenarios include screenshots.
+I can run the full suite or select scenarios by Cucumber tags."
+
+
+TECHNOLOGY CHOICES
+------------------
+
+Java 17
+  Provides the implementation language and the configured compiler target.
+
+Maven
+  Declares and resolves dependencies in pom.xml, compiles the sources, and
+  runs TestNG through Maven Surefire. The project can be built and tested
+  using standard Maven commands.
+
+Selenium WebDriver 4
+  Drives the browser UI. DriverFactory supports Chrome, Firefox, and Edge.
+  Selenium Manager can resolve the matching browser driver. The framework
+  uses explicit waits for page elements and a configurable page-load timeout.
+
+Cucumber
+  Stores behavior in .feature files written with Given/When/Then. The glue
+  code maps those sentences to Java step definitions. Feature tags allow
+  selecting groups of scenarios.
+
+TestNG
+  Is the execution/test framework used by cucumber-testng. TestRunner extends
+  AbstractTestNGCucumberTests, and testng.xml is the suite entry point used by
+  Maven Surefire.
+
+Page Object Model
+  Each page class encapsulates that page's locators and user operations.
+  Reusable actions and wait helpers are in BasePage; shared account-service
+  navigation is represented by AccountServicesMenu.
+
+Allure
+  Integrates with Cucumber to produce machine-readable test results in
+  target/allure-results. Hooks attach screenshots when a scenario fails.
+
+PicoContainer
+  Provides lightweight dependency injection for sharing TestContext with
+  hooks and step-definition classes for the same Cucumber scenario.
+
+
+PROJECT STRUCTURE
+-----------------
+
+pom.xml
+  Project coordinates, Java version, Selenium/Cucumber/TestNG/Allure
+  dependencies, compiler plugin, and Surefire/TestNG suite configuration.
+
+src/main/java/com/parabank/base/DriverFactory.java
+  Creates and stores the WebDriver in a ThreadLocal, reads browser settings,
+  and reliably quits/removes the driver after a scenario.
+
+src/main/java/com/parabank/base/BasePage.java
+  Common page operations: explicit waits, click, type, text retrieval,
+  visibility checks, dropdown selection, and navigation.
+
+src/main/java/com/parabank/pages/
+  Page objects for login, registration, accounts overview and details,
+  account opening, funds transfer, bill pay, transaction search, contact
+  information, loan requests, contact us, and forgotten-login lookup.
+
+src/main/java/com/parabank/pages/components/AccountServicesMenu.java
+  Shared navigation and logout operations for the signed-in area.
+
+src/main/java/com/parabank/models/User.java
+  Immutable object containing customer registration fields.
+
+src/main/java/com/parabank/utils/ConfigReader.java
+  Loads config.properties and applies the precedence:
+  Java system property -> environment variable -> properties file.
+  Missing required values produce a clear configuration error.
+
+src/main/java/com/parabank/utils/DataGenerator.java
+  Builds a registration User from configured fields and adds a time-based
+  suffix to the username, reducing conflicts between suite executions.
+
+src/test/java/com/parabank/hooks/Hooks.java
+  Starts a browser before each scenario, opens ParaBank, attaches a screenshot
+  on failure, and closes the browser in a finally block.
+
+src/test/java/com/parabank/context/TestContext.java
+  Scenario-level holder for WebDriver access and the generated registration
+  user. PicoContainer supplies the same context to scenario glue classes.
+
+src/test/java/com/parabank/stepdefs/
+  Maps Gherkin steps to page-object operations and uses TestNG assertions to
+  verify outcomes.
+
+src/test/java/com/parabank/runners/TestRunner.java
+  Configures feature discovery, glue packages, human-readable Cucumber output,
+  and the Allure Cucumber plugin.
+
+src/test/resources/features/
+  Business-readable scenarios for authentication, registration, transfers,
+  account services, and public pages.
+
+src/test/resources/config.properties
+  Environment-specific base URL, browser options, credentials, and scenario
+  data. Sensitive passwords should be provided as environment variables or
+  system properties rather than committed in plain text.
+
+src/test/resources/testng.xml
+  TestNG suite configuration loaded by Maven Surefire.
+
+src/test/resources/allure.properties
+  Sends Allure result files to target/allure-results.
+
+
+HOW TEST EXECUTION WORKS
+------------------------
+1. Maven Surefire loads src/test/resources/testng.xml.
+2. TestNG invokes TestRunner, which discovers the Cucumber features and uses
+   the configured glue packages.
+3. Before each scenario, Hooks asks DriverFactory for a fresh browser and
+   navigates to the configured ParaBank base URL.
+4. Cucumber executes the scenario's Given/When/Then steps. Step definitions
+   call page-object methods; page objects use BasePage wait and interaction
+   helpers.
+5. Assertions verify the expected visible page content or operation result.
+6. After the scenario, Hooks attaches a screenshot to Cucumber/Allure if the
+   scenario failed, then quits and removes the WebDriver.
+7. Allure result files are written beneath target/allure-results.
+
+The ThreadLocal driver allows per-thread driver ownership, but the current
+testng.xml deliberately runs the suite with parallel="false". Do not describe
+the current suite as parallelized. Scenarios are individually selectable and
+receive independent browser sessions.
+
+
+DESIGN AND RELIABILITY POINTS
+-----------------------------
+• Page objects isolate selectors and UI actions from business intent in
+  feature files. A locator change should usually be fixed in one page class.
+• BasePage uses explicit waits rather than fixed sleeps. This reduces timing
+  flakiness and waits for the state needed by an interaction.
+• The browser type, headless mode, base URL, wait timeouts, and test inputs
+  are configurable without changing Java code.
+• System property overrides are useful for local or CI-specific values; for
+  example, browser and headless mode can be changed at Maven invocation.
+• Driver cleanup is in a finally block so a failed assertion does not leave
+  the browser running.
+• Failed-scenario screenshots are useful evidence when investigating a test
+  failure.
+• Registration is represented by one ordinary Scenario, not a Scenario
+  Outline. Therefore it creates one generated customer each time that
+  scenario is selected and run.
+• The generated registration username is unique by a timestamp suffix;
+  other registration values are intentionally read from configuration.
+• Mutating workflows are tagged so they can be selected intentionally.
+
+
+CURRENT AUTOMATION COVERAGE
+---------------------------
+Authentication:
+  Successful login with configured credentials and a negative invalid-
+  password check.
+
+Registration:
+  Register one customer using configured customer fields and a generated
+  username.
+
+Account services:
+  View account overview, open account details/history, open a savings account,
+  and log out.
+
+Money and lending workflows:
+  Transfer funds, pay a bill, and submit a loan request using configured test
+  values.
+
+Other workflows:
+  Search transactions by amount, update contact information, submit the
+  contact form, open public information pages, and look up login information.
+
+This is broad customer-facing UI coverage, not exhaustive coverage of every
+possible application rule, backend service, administrator function, browser,
+or data combination. The site is a public demo, and its current account state
+and availability affect results.
+
+
+CONFIGURATION AND SECRET HANDLING
+---------------------------------
+The username and non-secret test values are in
+src/test/resources/config.properties. The password is configured as an
+environment-variable placeholder. Set PARABANK_PASSWORD in the shell before
+running tests, or supply a local Maven system-property override. The
+ConfigReader also accepts environment-variable overrides for other properties.
+Avoid committing real passwords, customer data, or account identifiers to
+source control. Use designated test data and credentials.
+
+On Windows PowerShell, an example session setup is:
+
+  $env:PARABANK_PASSWORD = "your-test-password"
+  mvn test
+
+The actual password is intentionally not printed in this guide.
+
+
+RUNNING THE FRAMEWORK
+---------------------
+
+Run all discovered scenarios:
+  mvn test
+
+Run only the negative-login scenario:
+  mvn test "-Dcucumber.filter.tags=@negative"
+
+Run the registration scenario once:
+  mvn test "-Dcucumber.filter.tags=@registration"
+
+Run smoke scenarios while excluding scenarios marked as mutating:
+  mvn test "-Dcucumber.filter.tags=@smoke and not @mutating"
+
+Choose a browser/headless mode using system properties:
+  mvn test "-Dbrowser=firefox" "-Dheadless=true"
+
+The default suite is sequential. Registration, transfers, bill payments,
+account opening, profile updates, and loan requests may change server-side
+demo-account state. Use a suitable test account and select mutating scenarios
+deliberately.
+
+
+REPORTING
+---------
+After a test run, Allure's raw result files are in target/allure-results.
+With the Allure command-line tool installed, generate and view the report:
+
+  allure serve target/allure-results
+
+The report can show scenario status and Cucumber steps. Screenshots are
+attached for failed scenarios. Maven Surefire also generates its normal test
+reports under target/surefire-reports.
+
+
+VALIDATION AND HONEST STATUS
+----------------------------
+The Maven test sources compiled successfully with:
+
+  mvn -q test-compile
+
+The invalid-password Cucumber scenario was run against the live application
+and passed. The successful-login smoke scenario was also attempted, but the
+live ParaBank application responded that the configured username/password
+could not be verified. This indicates the credentials were not accepted by
+the application at the time of that run; it is not evidence that the
+successful-login path passed. Re-run that scenario with current, authorized
+test-account credentials.
+
+Do not claim that every workflow has passed end to end unless those scenarios
+have actually been run and their results reviewed. In particular, account-
+mutating scenarios were not part of the safe login smoke verification.
+
+
+COMMON INTERVIEW QUESTIONS AND ANSWERS
+--------------------------------------
+
+Q: Why did you use the Page Object Model?
+A: It separates page structure and browser interactions from scenario intent.
+   Step definitions remain readable, and selector or interaction changes are
+   localized to the relevant page object. Common wait and interaction code is
+   reused through BasePage.
+
+Q: How do Cucumber and TestNG work together here?
+A: Cucumber parses the feature files and matches each step to Java glue code.
+   The TestNG Cucumber runner integrates those scenarios into the TestNG
+   execution lifecycle, which Maven Surefire starts using testng.xml.
+
+Q: How are browser resources managed?
+A: Hooks create a browser before each scenario and always quit it afterward.
+   DriverFactory stores the driver in a ThreadLocal, preventing accidental
+   sharing between threads if parallel execution is configured later.
+   Currently, the TestNG suite is explicitly sequential.
+
+Q: How do you avoid hard-coded waits?
+A: BasePage wraps Selenium WebDriverWait and waits for visibility or
+   clickability before interacting. Page-load and explicit-wait timeouts are
+   configurable. I avoid Thread.sleep because fixed delays are both slow and
+   unreliable.
+
+Q: How is test data managed?
+A: Most input values are in config.properties and can be overridden by
+   environment variables or Java system properties. Registration creates a
+   User model from those configured fields and appends a timestamp to the
+   username to reduce duplicate-user failures.
+
+Q: How do you handle failures and reporting?
+A: TestNG assertions fail the scenario when an expected condition is not met.
+   The After hook captures and attaches a screenshot on failure, and the
+   Allure Cucumber plugin records scenario and step results. Surefire also
+   writes Maven test reports.
+
+Q: Can scenarios run independently?
+A: Yes. Each scenario starts a fresh browser, and Cucumber tag filters allow
+   selecting a scenario or category. Some scenarios still depend on existing
+   server-side account data; data preconditions and test-account state must
+   be considered for mutating workflows.
+
+Q: Is the suite parallel?
+A: Not currently. The driver factory uses ThreadLocal ownership, but
+   testng.xml sets parallel="false". Parallel execution would require
+   deliberate validation of Cucumber/TestNG configuration, shared test data,
+   account contention, and the target application's behavior.
+
+Q: What would you improve next?
+A: I would add CI execution and environment-specific configuration, improve
+   test-data setup/cleanup and isolation, validate all mutating workflows
+   against a dedicated account, expand negative and boundary cases, and only
+   enable parallel execution after resolving shared-data dependencies. I
+   would also keep secrets in a CI secret store and refresh Selenium to match
+   the supported browser versions used by the execution environment.
+
+
+SHORT VERSION TO SAY IN AN INTERVIEW
+------------------------------------
+"This is a Java 17, Maven-based Selenium framework for ParaBank. I use
+Cucumber with TestNG for readable and independently selectable scenarios,
+and Page Object Model classes to encapsulate each page's locators and
+interactions. A shared BasePage provides explicit waits, while Hooks and a
+ThreadLocal DriverFactory manage browser startup, failure screenshots, and
+cleanup per scenario. Test data is externalized and can be overridden with
+environment variables or system properties; registration creates one
+timestamped unique username per run. Allure records scenario results and
+screenshots. I verified compilation and the invalid-login scenario. The
+configured valid-login attempt was rejected by the live demo site, so I
+would re-run it with confirmed current credentials before reporting it as a
+passing end-to-end test."
+
+
+PROJECT FILES TO OPEN DURING A WALKTHROUGH
+------------------------------------------
+1. pom.xml
+2. src/test/resources/features/login.feature
+3. src/test/java/com/parabank/stepdefs/LoginSteps.java
+4. src/main/java/com/parabank/pages/LoginPage.java
+5. src/main/java/com/parabank/base/BasePage.java
+6. src/main/java/com/parabank/base/DriverFactory.java
+7. src/test/java/com/parabank/hooks/Hooks.java
+8. src/test/resources/config.properties
+9. src/test/java/com/parabank/runners/TestRunner.java
+10. src/test/resources/testng.xml
+
+============================================================
+END
